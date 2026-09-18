@@ -1,0 +1,25 @@
+{
+  "name": "BrumQuest — Birmingham Photo Explorer",
+  "short_name": "BrumQuest",
+  "description": "A shared Birmingham city-centre photo hunt.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f7f7f5",
+  "theme_color": "#f7f7f5",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": [
+    "travel",
+    "games",
+    "lifestyle"
+  ]
+}
