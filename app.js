@@ -12,9 +12,9 @@ const categories = [
   { key:'city', label:'City Finds', icon:'🏙' },
   { key:'wild', label:'Wildlife', icon:'🐦' },
   { key:'food', label:'Food & Shopping', icon:'🍴' },
-  { key:'hist', label:'History', icon:'🏛' },
+  { key:'hist', label:'History & Hidden Birmingham', icon:'🏛' },
   { key:'bonus', label:'Bonus', icon:'☺' },
-  { key:'final', label:'Final', icon:'★' }
+  { key:'final', label:'Final Challenge', icon:'★' }
 ];
 
 const hunt = [
@@ -159,7 +159,7 @@ function categoryCounts(){
 }
 function renderFilters(target,active,type){
   target.innerHTML=categories.map(c=>{
-    const total=c.key==='all'?hunt.length:hunt.filter(i=>i.category===c.key).length;
+    const total=type==='capture'?(c.key==='all'?state.shared.completed.length:state.shared.completed.filter(x=>itemById(x.id)?.category===c.key).length):(c.key==='all'?hunt.length:hunt.filter(i=>i.category===c.key).length);
     return '<button class="filter '+(active===c.key?'active':'')+'" data-'+type+'-filter="'+c.key+'"><span class="filter-icon">'+c.icon+'</span>'+c.label+' <b>'+total+'</b></button>';
   }).join('');
 }
