@@ -12,3 +12,5 @@ Shared, installable Birmingham city-centre and canal photo-hunt PWA.
 Open the published Pages URL in Safari → Share → Add to Home Screen.
 
 Deployment trigger: complete GitHub Pages build with shared Supabase backend.
+
+<!-- deploy-trigger: 2026-09-18 -->
