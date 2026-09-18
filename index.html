@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>BrumQuest</title>
+  <meta name="description" content="A shared Birmingham city-centre and canal photo hunt.">
+  <meta name="theme-color" content="#f7f7f5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="BrumQuest">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+  <div id="linkGate" class="link-gate" hidden>
+    <div class="link-shell">
+      <div class="link-brand"><span>BQ</span><strong>BrumQuest</strong></div>
+
+      <section id="welcomePane" class="link-pane">
+        <div class="link-hero">
+          <p class="kicker">BIRMINGHAM, TOGETHER</p>
+          <h1>One shared quest.<br>Two phones.</h1>
+          <p>Link once and you both see the same points, captures and next destination while you explore.</p>
+        </div>
+        <div class="link-actions">
+          <button id="createChoice" class="link-primary">Set up a shared BrumQuest</button>
+          <button id="joinChoice" class="link-secondary">I have a linking code</button>
+        </div>
+        <p class="link-privacy">Live GPS stays on each phone. Only game progress, captures and the chosen destination are shared.</p>
+      </section>
+
+      <section id="createPane" class="link-pane" hidden>
+        <button id="createBack" class="link-back">‹ Back</button>
+        <p class="kicker">SET UP</p>
+        <h1>Create your link.</h1>
+        <p class="link-copy">Create a short one-time code and send it to the person joining you.</p>
+        <button id="createGame" class="link-primary">Create linking code</button>
+        <div class="code-box">
+          <span>YOUR LINKING CODE</span>
+          <strong id="linkCode">— — — — — —</strong>
+          <p id="createdHelp">The code will appear here.</p>
+        </div>
+        <div class="code-actions">
+          <button id="copyCode" class="link-secondary">Copy code</button>
+          <button id="shareCode" class="link-secondary">Share invite</button>
+        </div>
+        <button id="startApp" class="link-primary" hidden>Continue to BrumQuest</button>
+      </section>
+
+      <section id="joinPane" class="link-pane" hidden>
+        <button id="joinBack" class="link-back">‹ Back</button>
+        <p class="kicker">JOIN</p>
+        <h1>Link this phone.</h1>
+        <p class="link-copy">Enter the six-character code from the other phone.</p>
+        <label class="code-input-label" for="joinCode">Linking code</label>
+        <input id="joinCode" class="code-input" inputmode="text" autocomplete="one-time-code" autocapitalize="characters" maxlength="6" placeholder="ABC123">
+        <button id="joinGame" class="link-primary">Join shared BrumQuest</button>
+      </section>
+
+      <p id="linkError" class="link-error" role="alert"></p>
+    </div>
+  </div>
+
+  <div id="app">
+    <header class="masthead">
+      <button class="wordmark" data-nav="home" aria-label="BrumQuest home">
+        <span class="wordmark-mark">BQ</span>
+        <span class="wordmark-copy"><b>BrumQuest</b><small id="syncStatus">Shared game</small></span>
+      </button>
+      <div class="score-lockup"><b id="score">0</b><span>pts</span></div>
+    </header>
+
+    <main>
+      <section id="home" class="view active">
+        <div class="hero">
+          <p class="kicker">12 PHOTO CHALLENGES · CENTRAL BIRMINGHAM</p>
+          <h1>Your city is<br>the game.</h1>
+          <p class="hero-copy">Find a spot, take the right photo and build one shared record of Birmingham as you explore together.</p>
+          <button id="startNearby" class="action action-primary">Find a quest near me <span>→</span></button>
+        </div>
+        <div class="progress-strip">
+          <div><span>Progress</span><b><span id="doneStat">0</span>/12</b></div>
+          <div class="progress-track"><span id="progressFill"></span></div>
+          <div class="progress-meta"><span id="rankStat">Canal Rookie</span><span id="pointsStat">0 points</span></div>
+        </div>
+        <section class="section-block">
+          <div class="section-heading">
+            <div><p class="kicker">NEXT</p><h2 id="homeQuestHeading">Pick a first quest</h2></div>
+            <button class="quiet-button" data-nav="explore">All quests</button>
+          </div>
+          <div id="nearby" class="quest-list"></div>
+        </section>
+        <section class="how-it-works">
+          <div><span>01</span><p><b>Find it.</b><br>Get close enough to a challenge point.</p></div>
+          <div><span>02</span><p><b>Shoot it.</b><br>Take the challenge photograph.</p></div>
+          <div><span>03</span><p><b>Share it.</b><br>Points and the capture appear on both phones.</p></div>
+        </section>
+        <p class="safety-note"><b>Play safely.</b> Stay on public routes and towpaths. Never enter water, roads, railway land, worksites or private property for a photograph.</p>
+      </section>
+
+      <section id="explore" class="view">
+        <div class="page-intro">
+          <p class="kicker">BIRMINGHAM FIELD LIST</p>
+          <h1>Choose your next shot.</h1>
+          <p id="locationStatus" class="location-copy">Use your location to sort by what is closest.</p>
+          <button id="locate" class="location-button">◎ <span>Use my location</span></button>
+        </div>
+        <div class="filter-bar">
+          <button class="filter active" data-filter="all">All <span>12</span></button>
+          <button class="filter" data-filter="canal">Canal <span>4</span></button>
+          <button class="filter" data-filter="landmark">Places <span>4</span></button>
+          <button class="filter" data-filter="creative">Creative <span>4</span></button>
+        </div>
+        <div id="questList" class="quest-list quest-list-full"></div>
+      </section>
+
+      <section id="map" class="view map-view">
+        <div class="map-top"><div><p class="kicker">LIVE WALK</p><h1>Next stop.</h1></div><button id="recenterMap" class="map-recenter" aria-label="Recenter map">◎</button></div>
+        <div id="liveMap" class="live-map"></div>
+        <div class="route-panel">
+          <div class="route-target-row"><label for="mapTarget">Walking to</label><select id="mapTarget"></select></div>
+          <div class="route-summary"><div><span>Route</span><b id="routeDistance">Location needed</b></div><div><span>Walk</span><b id="routeTime">—</b></div></div>
+          <p id="routeStatus" class="route-status">Enable live location to draw the walking route.</p>
+          <button id="mapLocate" class="action action-primary">Use live location <span>◎</span></button>
+          <a id="externalDirections" class="map-external" target="_blank" rel="noopener">Open turn-by-turn directions <span>↗</span></a>
+        </div>
+        <p class="map-attribution">Map data © OpenStreetMap contributors · walking route via OpenStreetMap routing. Your live position is never shared with the linked phone.</p>
+      </section>
+
+      <section id="captures" class="view">
+        <div class="page-intro"><p class="kicker">SHARED ROLL</p><h1>Captures.</h1><p class="location-copy">A growing record of challenges completed by either linked phone.</p></div>
+        <div id="captureList" class="capture-grid"></div>
+      </section>
+
+      <section id="profile" class="view">
+        <div class="profile-header"><div class="rank-stamp" id="rankBadge">R</div><div><p class="kicker">SHARED STATUS</p><h1 id="profileTitle">Canal Rookie</h1><p id="nextRank" class="location-copy"></p></div></div>
+        <dl class="scoreboard"><div><dt>Points</dt><dd id="profileScore">0</dd></div><div><dt>Completed</dt><dd id="profileDone">0/12</dd></div><div><dt>Badges</dt><dd id="profileBadges">0/6</dd></div></dl>
+        <section class="section-block"><p class="kicker">BADGES</p><div id="badges" class="badge-list"></div></section>
+        <section class="settings">
+          <h2>Shared game</h2>
+          <button id="newLinkCode" class="setting-row"><span>Create new linking code</span><b>＋</b></button>
+          <div id="profileInviteBox" class="profile-invite" hidden><span>LINKING CODE</span><strong id="profileLinkCode"></strong><button id="profileShareCode">Share code</button></div>
+          <button id="install" class="setting-row" hidden><span>Install BrumQuest</span><b>→</b></button>
+          <p class="ios-install">On iPhone, install from Safari using <b>Share → Add to Home Screen</b>.</p>
+          <button id="leaveShared" class="setting-row setting-danger"><span>Leave shared BrumQuest on this phone</span><b>Leave</b></button>
+        </section>
+      </section>
+    </main>
+
+    <nav class="tabbar">
+      <button class="tab active" data-nav="home"><span class="tab-icon">⌂</span><small>Home</small></button>
+      <button class="tab" data-nav="explore"><span class="tab-icon">☷</span><small>Quests</small></button>
+      <button class="tab" data-nav="map"><span class="tab-icon">⌖</span><small>Map</small></button>
+      <button class="tab" data-nav="captures"><span class="tab-icon">▣</span><small>Captures</small></button>
+      <button class="tab" data-nav="profile"><span class="tab-icon">◎</span><small>Me</small></button>
+    </nav>
+
+    <dialog id="questDialog"><div class="sheet-handle"></div><button id="close" class="close-button" aria-label="Close challenge">×</button><div id="detail"></div></dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
