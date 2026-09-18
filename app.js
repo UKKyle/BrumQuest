@@ -420,8 +420,8 @@ async function bootstrap(){
       setupRealtime();
     }catch(e){
       console.error(e);
-      if(e?.code==='not_authorized'){
-        clearSession();showGate();$('#linkError').textContent='This phone is no longer linked. Join again with a new code.';
+      if(['not_authorized','device_not_linked','device_limit'].includes(e?.code)){
+        clearSession();showGate();$('#linkError').textContent='This phone has been unlinked or replaced. Use a new linking code from the other phone.';
       }else{
         render();
         toast('Offline or sync unavailable. Your link is still saved.');
