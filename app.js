@@ -74,14 +74,28 @@ const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 
 async function api(action,payload={}){
   const {data,error}=await supabase.functions.invoke('brumquest-api',{body:{action,...payload}});
-  if(error)throw error;
+  if(error){
+    try{
+      const detail=await error.context?.clone?.().json?.();
+      if(detail?.error){const e=new Error(detail.error);e.code=detail.error;throw e}
+    }catch(parsed){if(parsed?.code)throw parsed}
+    throw error;
+  }
   if(data?.error){const e=new Error(data.error);e.code=data.error;throw e}
   return data;
 }
-function auth(){return{groupId:state.session.groupId,accessKey:state.session.accessKey}}
+function auth(){return{groupId:state.session.groupId,accessKey:state.session.accessKey,deviceId:state.session.deviceId||''}}
 function readSession(){try{const x=JSON.parse(localStorage.getItem('brumquest-session'));return x?.groupId&&x?.accessKey?x:null}catch{return null}}
 function saveSession(x){state.session=x;localStorage.setItem('brumquest-session',JSON.stringify(x))}
-function clearSession(){localStorage.removeItem('brumquest-session');state.session=null;state.shared={completed:[],mapTarget:null,members:1,highlights:{}}}
+function readSharedCache(){try{return JSON.parse(localStorage.getItem('brumquest-shared-cache'))||null}catch{return null}}
+function saveSharedCache(x){try{localStorage.setItem('brumquest-shared-cache',JSON.stringify(x))}catch{}}
+function clearSession(){localStorage.removeItem('brumquest-session');localStorage.removeItem('brumquest-shared-cache');state.session=null;state.shared={completed:[],mapTarget:null,members:1,highlights:{}}}
+async function registerCurrentDevice(){
+  if(!state.session)return;
+  const d=await api('register-device',auth());
+  if(d.deviceId&&d.deviceId!==state.session.deviceId)saveSession({...state.session,deviceId:d.deviceId});
+  if(d.state)applyShared(d.state,true);
+}
 
 function applyShared(next,quiet=false){
   if(!next)return;
@@ -89,10 +103,11 @@ function applyShared(next,quiet=false){
   state.shared={
     completed:Array.isArray(next.completed)?next.completed:[],
     mapTarget:next.mapTarget||null,
-    members:Number(next.members||1),
+    members:Number(next.members||0),
     highlights:next.highlights||{},
     updatedAt:next.updatedAt||null
   };
+  saveSharedCache(state.shared);
   render();
   if($('#map').classList.contains('active')){renderMapTargets();refreshMapTarget(false)}
   const after=JSON.stringify({c:state.shared.completed.map(x=>x.id),t:state.shared.mapTarget,m:state.shared.members,h:state.shared.highlights});
@@ -118,7 +133,7 @@ async function createGame(){
   const b=$('#createGame');b.disabled=true;b.textContent='Creating…';
   try{
     const d=await api('create');
-    saveSession({groupId:d.groupId,accessKey:d.accessKey,role:'owner'});
+    saveSession({groupId:d.groupId,accessKey:d.accessKey,deviceId:d.deviceId,role:'owner'});
     applyShared(d.state,true);setupRealtime();
     $('#linkCode').textContent=d.code;$('#copyCode').dataset.code=d.code;$('#shareCode').dataset.code=d.code;
     $('#startApp').hidden=false;b.hidden=true;
@@ -131,7 +146,7 @@ async function joinGame(){
   const b=$('#joinGame');b.disabled=true;b.textContent='Joining…';
   try{
     const d=await api('join',{code});
-    saveSession({groupId:d.groupId,accessKey:d.accessKey,role:'member'});
+    saveSession({groupId:d.groupId,accessKey:d.accessKey,deviceId:d.deviceId,role:'member'});
     applyShared(d.state,true);setupRealtime();hideGate();navigate('home');
     history.replaceState({},'',location.pathname);toast('Linked. Shared sync is live.');
   }catch(e){console.error(e);$('#linkError').textContent=e.code==='expired_code'?'That code has expired. Create a new one on the other phone.':e.code==='group_full'?'Two phones are already linked to that hunt.':'That linking code is not valid.';b.disabled=false;b.textContent='Join shared BrumQuest'}
@@ -141,13 +156,28 @@ async function copyCode(code){if(!code)return;try{await navigator.clipboard.writ
 async function shareCode(code){if(!code)return;if(navigator.share){try{await navigator.share({title:'Join my BrumQuest',text:'Join my Birmingham scavenger hunt with code '+code,url:inviteUrl(code)});return}catch(e){if(e?.name==='AbortError')return}}copyCode(code)}
 async function newInvite(){
   const b=$('#newLinkCode');b.disabled=true;
-  try{const d=await api('invite',auth());$('#profileLinkCode').textContent=d.code;$('#profileShareCode').dataset.code=d.code;$('#profileInviteBox').hidden=false}
-  catch(e){toast(e.code==='group_full'?'Two phones are already linked.':'Could not create a code.')}
+  try{
+    const d=await api('invite',auth());
+    $('#profileLinkCode').textContent=d.code;
+    $('#profileShareCode').dataset.code=d.code;
+    $('#profileInviteBox').hidden=false;
+    $('#profileInviteBox').querySelector('span').textContent=d.mode==='replace'?'REPLACEMENT CODE':'LINKING CODE';
+    toast(d.mode==='replace'?'Replacement code ready. The joining phone will replace the other linked phone.':'Linking code ready.');
+  }catch(e){toast('Could not create a linking code.')}
   finally{b.disabled=false}
 }
 async function leave(){
   if(!confirm('Leave this shared BrumQuest on this phone? Shared captures will remain available on the other linked phone.'))return;
-  if(state.channel)supabase.removeChannel(state.channel);clearInterval(state.poll);clearSession();showGate();
+  try{
+    await api('leave-device',auth());
+    if(state.channel)supabase.removeChannel(state.channel);
+    clearInterval(state.poll);
+    clearSession();
+    showGate();
+  }catch(e){
+    console.error(e);
+    toast('Connect to the internet before unlinking this phone.');
+  }
 }
 
 function categoryCounts(){
@@ -189,7 +219,7 @@ function render(){
   $('#foundHome').textContent=n;$('#foundProfile').textContent=n;$('#captureCount').textContent=n;
   $('#scoreRing').style.setProperty('--progress',s*3.6+'deg');
   $('#scoreHint').textContent=n===0?'Take your first photo to get started.':n===78?'You found every item. Birmingham complete.':(78-n)+' finds left.';
-  $('#syncStatus').textContent=state.shared.members>=2?'2 phones linked · live sync':'Waiting for second phone';
+  $('#syncStatus').textContent=!navigator.onLine?'Offline · link saved':state.shared.members>=2?'2 phones linked · live sync':'Ready to link another phone';
   $('#nextMilestone').textContent=n===78?'All 78 finds complete.':Math.max(0,78-n)+' finds remaining.';
 
   $('#categoryProgress').innerHTML=counts.map(c=>'<button class="category-card" data-home-category="'+c.key+'"><span>'+c.icon+'</span><div><b>'+c.label+'</b><small>'+c.done+' / '+c.total+' found</small></div><strong>'+Math.round(c.done/c.total*100)+'%</strong></button>').join('');
@@ -239,7 +269,7 @@ function openItem(id){
   const record=completed(id),category=cat(item.category);
   let body='';
   if(record){
-    body='<button class="large-capture" data-photo="'+id+'>'+(record.photoUrl?'<img src="'+esc(record.photoUrl)+'" alt="'+esc(item.title)+'">':'<span>Photo unavailable</span>')+'</button><div class="complete-banner">✓ Found · shared on both phones</div>';
+    body='<button class="large-capture" data-photo="'+id+'>'+(record.photoUrl?'<img src="'+esc(record.photoUrl)+'" alt="'+esc(item.title)+'">':'<span>Photo unavailable</span>')+'</button><div class="complete-banner">✓ Found · shared on both phones</div><div class="capture-edit-actions"><label class="button button-secondary"><input id="replacePhotoInput" type="file" accept="image/*" capture="environment" hidden>Replace photo</label><button id="deleteCapture" class="button button-danger">Remove capture</button></div>';
   }else{
     body='<label class="photo-button"><input id="photoInput" type="file" accept="image/*" capture="environment" hidden><span>Take / choose photo</span><span>＋</span></label><div id="photoPreview" class="photo-preview" hidden></div><button id="saveCapture" class="button button-primary" disabled>Save shared capture</button><p class="sheet-note">No GPS check is required for scavenger finds. Use a photo that clearly shows the thing you found.</p>';
   }
@@ -250,6 +280,8 @@ function openItem(id){
     $('#saveCapture').onclick=saveCapture;
   }else{
     const p=$('#itemDetail [data-photo]');if(p)p.onclick=()=>{$('#itemDialog').close();openPhoto(id)};
+    if($('#replacePhotoInput'))$('#replacePhotoInput').onchange=replaceCapture;
+    if($('#deleteCapture'))$('#deleteCapture').onclick=deleteCapture;
   }
 }
 function choosePhoto(e){
@@ -266,6 +298,25 @@ async function saveCapture(){
     const d=await api('complete',{...auth(),questId:item.id,photoBase64});
     applyShared(d.state,true);await broadcast();$('#itemDialog').close();state.photo=null;clearPreview();toast('Captured · '+item.title);
   }catch(e){console.error(e);b.disabled=false;b.textContent='Save shared capture';toast('Could not save that capture. Try again.')}
+}
+async function replaceCapture(e){
+  const file=e.target.files?.[0],item=state.activeItem;
+  if(!file||!item)return;
+  if(!file.type.startsWith('image/'))return toast('Choose an image file.');
+  toast('Replacing photo…');
+  try{
+    const blob=await compress(file),photoBase64=await b64(blob);
+    const d=await api('replace',{...auth(),questId:item.id,photoBase64});
+    applyShared(d.state,true);await broadcast();$('#itemDialog').close();toast('Photo replaced');
+  }catch(err){console.error(err);toast('Could not replace that photo.')}
+}
+async function deleteCapture(){
+  const item=state.activeItem;
+  if(!item||!confirm('Remove this capture and mark the item as not found?'))return;
+  try{
+    const d=await api('delete-capture',{...auth(),questId:item.id});
+    applyShared(d.state,true);await broadcast();$('#itemDialog').close();toast('Capture removed');
+  }catch(err){console.error(err);toast('Could not remove that capture.')}
 }
 function openPhoto(id){
   const record=completed(id),item=itemById(id);if(!record||!item)return;
@@ -357,8 +408,27 @@ async function compress(file){
 function b64(blob){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result||'').split(',')[1]||'');r.onerror=()=>rej(r.error);r.readAsDataURL(blob)})}
 
 async function bootstrap(){
-  state.session=readSession();const join=new URLSearchParams(location.search).get('join');
-  if(state.session){hideGate();try{await refresh(true);setupRealtime()}catch(e){console.error(e);clearSession();showGate();$('#linkError').textContent='This phone is no longer linked. Join again with a new code.'}return}
+  state.session=readSession();
+  const join=new URLSearchParams(location.search).get('join');
+  const cached=readSharedCache();
+  if(state.session){
+    hideGate();
+    if(cached)applyShared(cached,true);
+    try{
+      await registerCurrentDevice();
+      await refresh(true);
+      setupRealtime();
+    }catch(e){
+      console.error(e);
+      if(e?.code==='not_authorized'){
+        clearSession();showGate();$('#linkError').textContent='This phone is no longer linked. Join again with a new code.';
+      }else{
+        render();
+        toast('Offline or sync unavailable. Your link is still saved.');
+      }
+    }
+    return;
+  }
   showGate(join?'join':'welcome');if(join)$('#joinCode').value=join.toUpperCase();
 }
 
@@ -373,7 +443,9 @@ $('#createGame').onclick=createGame;$('#joinGame').onclick=joinGame;$('#startApp
 $('#newLinkCode').onclick=newInvite;$('#profileShareCode').onclick=()=>shareCode($('#profileShareCode').dataset.code);$('#leaveShared').onclick=leave;$('#saveHighlights').onclick=saveHighlights;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.deferredInstall=e;$('#install').hidden=false});
 $('#install').onclick=async()=>{if(!state.deferredInstall)return;state.deferredInstall.prompt();await state.deferredInstall.userChoice;state.deferredInstall=null;$('#install').hidden=true};
-window.addEventListener('online',()=>refresh(true).catch(()=>{}));window.addEventListener('focus',()=>refresh(true).catch(()=>{}));
+window.addEventListener('online',()=>{render();registerCurrentDevice().then(()=>refresh(true)).then(()=>setupRealtime()).catch(()=>{})});
+window.addEventListener('offline',render);
+window.addEventListener('focus',()=>refresh(true).catch(()=>{}));
 window.addEventListener('pagehide',()=>{if(state.watchId!==null&&navigator.geolocation)navigator.geolocation.clearWatch(state.watchId)});
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(console.error));
 
