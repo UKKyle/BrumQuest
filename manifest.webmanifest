@@ -1,7 +1,7 @@
 {
-  "name": "BrumQuest — Birmingham Photo Explorer",
+  "name": "BrumQuest — Birmingham Scavenger Hunt",
   "short_name": "BrumQuest",
-  "description": "A shared Birmingham city-centre photo hunt.",
+  "description": "A shared 78-item Birmingham scavenger hunt with photo captures and live map exploration.",
   "id": "./",
   "start_url": "./",
   "scope": "./",
