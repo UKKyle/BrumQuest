@@ -249,7 +249,7 @@ function openItem(id){
     $('#photoInput').onchange=choosePhoto;
     $('#saveCapture').onclick=saveCapture;
   }else{
-    const p=$('#itemDetail [data-photo]');if(p)p.onclick=()=>openPhoto(id);
+    const p=$('#itemDetail [data-photo]');if(p)p.onclick=()=>{$('#itemDialog').close();openPhoto(id)};
   }
 }
 function choosePhoto(e){
